@@ -1,0 +1,21 @@
+{
+  "name": "approval-system-vscode",
+  "version": "0.3.0",
+  "description": "EasyPay Approval Control Center: local Express server with full dashboard, Google Sheet database, Drive evidence via Apps Script webhook",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "check": "node --check server.js && node --check public/app.js && node --check src/integrations/appsScriptClient.js && node --check src/integrations/googleSheetsClient.js && node --check src/integrations/googleDriveClient.js && node --check src/routes/approval.routes.js && node --check src/routes/dashboard.routes.js && node --check src/routes/employee.routes.js && node --check src/routes/report.routes.js && node --check src/routes/shop.routes.js && node --check src/services/approvalService.js && node --check src/services/dashboardService.js && node --check src/services/employeeService.js && node --check src/services/reportService.js && node --check src/services/commissionService.js && node --check src/services/shopService.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dayjs": "^1.11.13",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "multer": "^1.4.5-lts.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}

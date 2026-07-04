@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EasyPay Control Center</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div id="loading" class="loading hidden">
+    <div class="spinner"></div>
+    <div>
+      <b id="loading-title">กำลังดำเนินการ...</b>
+      <small id="loading-detail">โปรดรอสักครู่</small>
+    </div>
+  </div>
+  <div id="toast" class="toast hidden"></div>
+
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-logo"><i class="fa-solid fa-chart-line"></i></div>
+        <div>
+          <h1>EasyPay Control Center</h1>
+          <p>Production Operation</p>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <p>MAIN</p>
+        <button class="active" data-section="overview"><i class="fa-solid fa-house"></i><span>ภาพรวม</span></button>
+        <button data-section="case"><i class="fa-solid fa-pen-to-square"></i><span>บันทึก/แก้ไขเคส</span></button>
+        <button data-section="summary"><i class="fa-solid fa-table"></i><span>ตารางสรุป</span></button>
+        <button data-section="kpi"><i class="fa-solid fa-chart-simple"></i><span>Dashboard KPI</span></button>
+        <p>งานอนุมัติ</p>
+        <button data-section="complete"><i class="fa-solid fa-circle-check"></i><span>เสร็จสมบูรณ์</span></button>
+        <button data-section="wait"><i class="fa-solid fa-hourglass-half"></i><span>อนุมัติ-รอปิดเคส</span></button>
+        <p>PEOPLE & PAY</p>
+        <button data-section="employees"><i class="fa-solid fa-users"></i><span>พนักงาน</span></button>
+        <button data-section="targets"><i class="fa-solid fa-bullseye"></i><span>เป้าหมายระบบ</span></button>
+        <button data-section="shops"><i class="fa-solid fa-store"></i><span>ร้านค้า Top Sale</span></button>
+        <button data-section="commission"><i class="fa-solid fa-baht-sign"></i><span>รายงานค่าคอม</span></button>
+        <button data-section="ranking"><i class="fa-solid fa-trophy"></i><span>Top 10 Ranking</span></button>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button id="menu-btn" class="icon-btn" type="button"><i class="fa-solid fa-bars"></i></button>
+          <div>
+            <h2 id="page-title">ภาพรวม</h2>
+            <p>ระบบอนุมัติงานและค่าคอมมิชชั่น</p>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <button id="theme-btn" class="icon-btn" type="button"><i class="fa-solid fa-moon"></i></button>
+          <span class="sync-pill">Last Sync <b id="last-sync">-</b></span>
+          <span id="health-status" class="live-pill">CHECKING</span>
+        </div>
+      </header>
+
+      <section class="section active" id="sec-overview">
+        <div class="section-hero">
+          <div>
+            <h2><i class="fa-solid fa-gauge-high"></i> ภาพรวมระบบ</h2>
+            <p>สรุปเคส ยอดสินเชื่อ ร้านค้า และกราฟรายวัน</p>
+          </div>
+          <button class="btn btn-soft" type="button" data-refresh><i class="fa-solid fa-rotate"></i> รีเฟรชข้อมูล</button>
+        </div>
+        <div id="overview-kpis" class="kpi-grid"></div>
+        <div class="grid-3">
+          <div class="card dark-card"><div class="card-head"><h3>รายงานยอดเคส Daily</h3></div><div id="overview-case-daily" class="card-body"></div></div>
+          <div class="card dark-card"><div class="card-head"><h3>รายงานยอดสินเชื่อ Daily</h3></div><div id="overview-revenue-daily" class="card-body"></div></div>
+          <div class="card dark-card"><div class="card-head"><h3>รายงานจำนวนร้านค้า Daily</h3></div><div id="overview-shop-daily" class="card-body"></div></div>
+        </div>
+        <div class="grid-2">
+          <div class="card"><div class="card-head"><h3>ยอดสินเชื่อรายวัน</h3></div><div class="chart-box"><canvas id="overviewRevenueChart"></canvas></div></div>
+          <div class="card"><div class="card-head"><h3>จำนวนเคสรายระบบ</h3></div><div class="chart-box"><canvas id="overviewSystemChart"></canvas></div></div>
+        </div>
+      </section>
+
+      <section class="section" id="sec-case">
+        <div class="section-hero">
+          <div>
+            <h2><i class="fa-solid fa-pen-to-square"></i> บันทึก / แก้ไขเคส</h2>
+            <p>เพิ่ม แก้ไข ตรวจสอบ และติดตามรายการอนุมัติรายวันในหน้าเดียว</p>
+          </div>
+          <button class="btn btn-soft" type="button" data-refresh><i class="fa-solid fa-rotate"></i> รีเฟรชข้อมูล</button>
+        </div>
+
+        <section class="card form-card">
+          <div class="card-head">
+            <div>
+              <h3><i class="fa-solid fa-file-circle-check"></i> ฟอร์มบันทึก / แก้ไขเคส <span class="mini-pill">TAT/SLA Ready</span></h3>
+              <p>ระบบล็อกผู้อนุมัติเอกสารและปิดเคสเป็นคนเดียวกับใบสินเชื่อ</p>
+            </div>
+            <div class="toolbar compact">
+              <button id="sync-shops-btn" class="btn btn-soft" type="button"><i class="fa-solid fa-store"></i> ซิงก์ร้านค้า</button>
+              <button id="save-shop-btn" class="btn btn-soft" type="button"><i class="fa-solid fa-plus"></i> เพิ่ม/อัปเดตร้านค้านี้</button>
+              <button id="clear-btn" class="btn btn-ghost" type="button">ล้างฟอร์ม</button>
+            </div>
+          </div>
+
+          <form id="approval-form" enctype="multipart/form-data" class="card-body">
+            <input type="hidden" id="loanEvidenceExisting" name="loanEvidenceExisting">
+            <input type="hidden" id="docEvidenceExisting" name="docEvidenceExisting">
+            <input type="hidden" id="closeEvidenceExisting" name="closeEvidenceExisting">
+            <input type="hidden" id="docApproval" name="docApproval">
+            <input type="hidden" id="closeApproval" name="closeApproval">
+            <input type="hidden" id="caseReceivedAt" name="caseReceivedAt">
+            <input type="hidden" id="loanCompletedAt" name="loanCompletedAt">
+            <input type="hidden" id="docCompletedAt" name="docCompletedAt">
+            <input type="hidden" id="closeCompletedAt" name="closeCompletedAt">
+            <input type="hidden" id="slaMinutes" name="slaMinutes" value="20">
+            <input type="hidden" id="slaStatus" name="slaStatus">
+            <input type="hidden" id="tatMinutes" name="tatMinutes">
+            <datalist id="shop-list"></datalist>
+
+            <div class="form-grid">
+              <label>วันที่และเวลา <span>*</span>
+                <input id="dateDisplay" type="text" readonly aria-live="polite" autocomplete="off">
+                <input id="date" name="date" type="hidden" required>
+                <small>นับเวลาแบบ Realtime แก้ไขไม่ได้</small>
+              </label>
+              <label>อนุมัติใบสินเชื่อ <span>*</span>
+                <select id="loanApproval" name="loanApproval" required></select>
+              </label>
+              <label>เลขสัญญา <span>*</span>
+                <input id="contractNo" name="contractNo" placeholder="เช่น MV26053100078, CSR0003079" required>
+              </label>
+              <label>ร้านค้า <span>*</span>
+                <input id="shop" name="shop" list="shop-list" placeholder="พิมพ์หรือเลือกร้านค้า" autocomplete="off" required>
+                <small>เลือกจากแท็บ ร้านอยู่จังหวัดไหน หรือเพิ่มใหม่ได้</small>
+              </label>
+              <label>จังหวัด
+                <input id="province" name="province" placeholder="จังหวัดจะเติมอัตโนมัติ">
+              </label>
+              <label>ราคาสินค้า <span>*</span>
+                <input id="price" name="price" inputmode="numeric" placeholder="20,000" required>
+              </label>
+              <label>สถานะเคส
+                <input id="caseStatus" readonly placeholder="ระบบคำนวณอัตโนมัติ">
+              </label>
+              <label class="wide-2">หมายเหตุ
+                <textarea id="note" name="note" placeholder="เช่น เคสออนไลน์"></textarea>
+              </label>
+            </div>
+
+            <section class="workflow-panel">
+              <div class="workflow-title">
+                <strong><i class="fa-solid fa-diagram-project"></i> Workflow Control</strong>
+                <span id="workflow-helper">ต้องแนบหลักฐานใบสินเชื่อก่อน จึงจะทำขั้นตอนถัดไปได้</span>
+              </div>
+
+              <div class="step-progress">
+                <div class="progress-step active" id="progress-created"><b>1</b><span>รับเคส</span></div>
+                <div class="progress-line" id="line-created-loan"></div>
+                <div class="progress-step" id="progress-loan"><b>2</b><span>ใบสินเชื่อ</span></div>
+                <div class="progress-line" id="line-loan-doc"></div>
+                <div class="progress-step" id="progress-doc"><b>3</b><span>เอกสาร</span></div>
+                <div class="progress-line" id="line-doc-close"></div>
+                <div class="progress-step" id="progress-close"><b>4</b><span>ปิดเคส</span></div>
+              </div>
+
+              <div class="step-grid">
+                <div class="step-card required" id="loan-step-card">
+                  <div class="step-no">1</div>
+                  <h4>Loan Approval / อนุมัติใบสินเชื่อ</h4>
+                  <p>ผู้อนุมัติหลัก</p>
+                  <div class="locked-name" id="loan-owner">ยังไม่ได้เลือกผู้อนุมัติ</div>
+                  <label class="file-label">หลักฐานใบสินเชื่อ <span>*</span>
+                    <input id="loanEvidenceFile" name="loanEvidenceFile" type="file" accept="image/*">
+                  </label>
+                  <a id="loanEvidenceLink" class="evidence-link hidden" target="_blank" rel="noreferrer">เปิดหลักฐานเดิม</a>
+                </div>
+
+                <div class="step-card locked" id="doc-step-card">
+                  <div class="step-no">2</div>
+                  <h4>Document Approval / อนุมัติเอกสาร</h4>
+                  <p>ต้องเป็นคนเดียวกับใบสินเชื่อ</p>
+                  <label class="toggle-line"><input id="enableDocStep" type="checkbox"> ทำขั้นตอนอนุมัติเอกสาร</label>
+                  <div class="locked-name" id="doc-owner">ล็อกตามผู้อนุมัติใบสินเชื่อ</div>
+                  <label class="file-label">หลักฐานเอกสาร
+                    <input id="docEvidenceFile" name="docEvidenceFile" type="file" accept="image/*" disabled>
+                  </label>
+                  <a id="docEvidenceLink" class="evidence-link hidden" target="_blank" rel="noreferrer">เปิดหลักฐานเดิม</a>
+                </div>
+
+                <div class="step-card locked" id="close-step-card">
+                  <div class="step-no">3</div>
+                  <h4>Close Case / อนุมัติปิดเคส</h4>
+                  <p>ต้องเป็นคนเดียวกับใบสินเชื่อ</p>
+                  <label class="toggle-line"><input id="enableCloseStep" type="checkbox"> ทำขั้นตอนปิดเคส</label>
+                  <div class="locked-name" id="close-owner">ล็อกตามผู้อนุมัติใบสินเชื่อ</div>
+                  <label class="file-label">หลักฐานปิดเคส
+                    <input id="closeEvidenceFile" name="closeEvidenceFile" type="file" accept="image/*" disabled>
+                  </label>
+                  <a id="closeEvidenceLink" class="evidence-link hidden" target="_blank" rel="noreferrer">เปิดหลักฐานเดิม</a>
+                </div>
+              </div>
+
+              <section class="sla-panel" aria-label="TAT and SLA Control">
+                <div class="sla-head">
+                  <div>
+                    <strong><i class="fa-solid fa-stopwatch"></i> TAT / SLA Control</strong>
+                    <span>แสดงเวลารับเคส เวลาทำแต่ละขั้นตอน และผล SLA 20 นาที</span>
+                  </div>
+                  <div class="sla-badges"><b class="sla-status" id="sla-status-badge">RUNNING</b><b class="sla-target" id="sla-target-badge">เข้า 20 นาที</b></div>
+                </div>
+                <div class="sla-timeline">
+                  <div><small>รับเคส</small><b id="sla-received-time">-</b></div>
+                  <div><small>ใบสินเชื่อ</small><b id="sla-loan-time">-</b></div>
+                  <div><small>เอกสาร</small><b id="sla-doc-time">-</b></div>
+                  <div><small>ปิดเคส</small><b id="sla-close-time">-</b></div>
+                  <div><small>TAT ปัจจุบัน</small><b id="sla-elapsed-time">0 นาที</b></div>
+                </div>
+              </section>
+
+              <div class="tat-strip">
+                <div><b id="loan-state">-</b><span>Loan Evidence</span></div>
+                <div><b id="doc-state">-</b><span>Doc Evidence</span></div>
+                <div><b id="close-state">-</b><span>Close Evidence</span></div>
+                <div><b id="same-owner-state">-</b><span>Same Owner</span></div>
+              </div>
+            </section>
+
+            <div class="form-actions">
+              <button id="submit-btn" class="btn btn-green" type="submit"><i class="fa-solid fa-floppy-disk"></i> บันทึกข้อมูล</button>
+              <button class="btn btn-gray" type="button" id="reset-btn">เริ่มใหม่</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card list-card">
+          <div class="card-head">
+            <h3><i class="fa-solid fa-calendar-day"></i> รายการอนุมัติรายวัน</h3>
+            <button class="btn btn-soft" type="button" data-refresh><i class="fa-solid fa-rotate"></i> รีเฟรชข้อมูล</button>
+          </div>
+          <div class="card-body">
+            <div class="toolbar filter-toolbar">
+              <input id="daily-search" placeholder="ค้นหาเลขสัญญา ร้านค้า จังหวัด หรือผู้อนุมัติ">
+              <select id="daily-system"><option value="">ทุกระบบ</option><option>MV</option><option>CSR</option><option>BN</option><option>ECR</option><option>KK</option></select>
+              <button id="daily-clear" class="btn btn-gray" type="button">ล้าง</button>
+            </div>
+            <div id="daily-table"></div>
+          </div>
+        </section>
+      </section>
+
+      <section class="section" id="sec-summary">
+        <div class="card">
+          <div class="card-head"><h3><i class="fa-solid fa-table"></i> ตารางสรุปทั้งหมด</h3><div class="toolbar"><button class="btn btn-soft" data-refresh type="button"><i class="fa-solid fa-rotate"></i> รีเฟรช</button><button id="status-update" class="btn btn-soft" type="button"><i class="fa-solid fa-arrows-rotate"></i> อัปเดตสถานะ</button><button id="daily-report-save" class="btn btn-soft" type="button"><i class="fa-solid fa-calendar-check"></i> สร้างรายงานวันนี้</button><button id="summary-export" class="btn btn-green" type="button"><i class="fa-solid fa-file-excel"></i> Excel</button></div></div>
+          <div class="card-body">
+            <div class="toolbar filter-toolbar">
+              <input id="summary-keyword" placeholder="ค้นหา เลขสัญญา ร้านค้า จังหวัด พนักงาน สถานะ...">
+              <select id="summary-status"><option value="">ทุกสถานะ</option><option>เสร็จสมบูรณ์</option><option>อนุมัติ-รอปิดเคส</option></select>
+              <input id="summary-month" type="month">
+              <input id="summary-from" type="date" title="วันที่เริ่มต้น">
+              <input id="summary-to" type="date" title="วันที่สิ้นสุด">
+              <select id="summary-system"><option value="">ทุกระบบ</option><option>MV</option><option>CSR</option><option>BN</option><option>ECR</option><option>KK</option></select>
+              <button id="summary-clear" class="btn btn-gray" type="button">ล้าง</button>
+            </div>
+            <div id="summary-table"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="sec-kpi">
+        <div class="kpi-shell">
+          <div class="kpi-head"><div><h2><i class="fa-solid fa-chart-simple"></i> Dashboard KPI รายวัน</h2><p>ติดตามรอปิดเคส ปิดเคสแล้ว ยอดสินเชื่อ และจำนวนตามระบบ</p></div><div class="toolbar"><input id="kpi-from" type="date"><input id="kpi-to" type="date"><button id="kpi-clear" class="btn btn-gray" type="button">ล้าง</button></div></div>
+          <div id="kpi-cards" class="grid-3"></div>
+          <div class="grid-3">
+            <div class="card dark-card"><div class="card-head"><h3>รอปิดเคส Daily</h3></div><div id="kpi-wait-daily" class="card-body"></div></div>
+            <div class="card dark-card"><div class="card-head"><h3>ปิดเคสแล้ว Daily</h3></div><div id="kpi-closed-daily" class="card-body"></div></div>
+            <div class="card dark-card"><div class="card-head"><h3>ยอดสินเชื่อปิดเคส Daily</h3></div><div id="kpi-amount-daily" class="card-body"></div></div>
+          </div>
+          <div class="grid-2"><div class="card dark-card"><div class="card-head"><h3>กราฟรายวัน</h3></div><div class="chart-box"><canvas id="kpiDailyChart"></canvas></div></div><div class="card dark-card"><div class="card-head"><h3>กราฟรายระบบ</h3></div><div class="chart-box"><canvas id="kpiSystemChart"></canvas></div></div></div>
+        </div>
+      </section>
+
+      <section class="section" id="sec-complete">
+        <div class="approval-hero complete"><div><h2><i class="fa-solid fa-circle-check"></i> งานอนุมัติ - เสร็จสมบูรณ์ <span id="complete-count" class="count-pill">0</span></h2><p>รายการอนุมัติที่เสร็จสมบูรณ์แล้วทั้งหมด</p></div><button id="complete-export" class="btn btn-white" type="button">Export Excel</button></div>
+        <div class="card"><div class="card-body"><div class="toolbar filter-toolbar"><input id="complete-from" type="date"><input id="complete-to" type="date"><select id="complete-employee"><option value="">พนักงานทั้งหมด</option></select><select id="complete-shop"><option value="">ทุกร้านค้า</option></select><select id="complete-province"><option value="">ทุกจังหวัด</option></select><select id="complete-system"><option value="">ทุกระบบ</option><option>MV</option><option>CSR</option><option>BN</option><option>ECR</option><option>KK</option></select><button id="complete-clear" class="btn btn-gray" type="button">ล้าง</button></div><div id="complete-table"></div></div></div>
+      </section>
+
+      <section class="section" id="sec-wait">
+        <div class="approval-hero wait"><div><h2><i class="fa-solid fa-hourglass-half"></i> งานอนุมัติ - อนุมัติ-รอปิดเคส <span id="wait-count" class="count-pill">0</span></h2><p>รายการที่อนุมัติแล้วและรอปิดเคส</p></div><button id="wait-export" class="btn btn-white" type="button">Export Excel</button></div>
+        <div class="card"><div class="card-body"><div class="toolbar filter-toolbar"><input id="wait-from" type="date"><input id="wait-to" type="date"><select id="wait-employee"><option value="">พนักงานทั้งหมด</option></select><select id="wait-shop"><option value="">ทุกร้านค้า</option></select><select id="wait-province"><option value="">ทุกจังหวัด</option></select><select id="wait-system"><option value="">ทุกระบบ</option><option>MV</option><option>CSR</option><option>BN</option><option>ECR</option><option>KK</option></select><button id="wait-clear" class="btn btn-gray" type="button">ล้าง</button></div><div id="wait-table"></div></div></div>
+      </section>
+
+      <section class="section" id="sec-employees">
+        <div class="employee-hero"><div><h2><i class="fa-solid fa-users"></i> ข้อมูลพนักงานอนุมัติสินเชื่อ</h2><p>ติดตามผลงาน ค่าคอม และสรุป KPI รายพนักงาน</p></div><span id="employee-count" class="count-pill">0</span></div>
+        <div id="employee-role-summary" class="grid-3"></div>
+        <div class="grid-2"><div class="card"><div class="card-head"><h3>Top 10 ผลงานรวม</h3></div><div class="chart-box"><canvas id="employeeWorkChart"></canvas></div></div><div class="card"><div class="card-head"><h3>สัดส่วนงาน</h3></div><div class="chart-box"><canvas id="employeeRoleChart"></canvas></div></div></div>
+        <div class="card"><div class="card-body"><div class="toolbar filter-toolbar"><input id="employee-keyword" placeholder="ค้นหาชื่อพนักงานหรือชื่อเล่น"><select id="employee-status"><option value="">ทุกสถานะ</option><option value="active">ปฏิบัติงาน</option><option value="off">หยุด/ลา/ลาป่วย</option></select></div><div id="employee-cards" class="employee-grid"></div><div id="employee-detail"></div></div></div>
+      </section>
+
+      <section class="section" id="sec-targets">
+        <div class="card"><div class="card-head"><h3><i class="fa-solid fa-bullseye"></i> เป้าหมายระบบ</h3></div><div class="card-body"><div id="target-cards" class="grid-5"></div><div id="target-table"></div></div></div>
+      </section>
+
+      <section class="section" id="sec-shops">
+        <div class="section-hero"><div><h2><i class="fa-solid fa-store"></i> ร้านค้า Top Sale</h2><p>สรุปยอดขาย จำนวนเคส และจัดการฐานข้อมูลร้านค้า/จังหวัด</p></div><button class="btn btn-soft" data-refresh type="button"><i class="fa-solid fa-rotate"></i> รีเฟรช</button></div>
+        <div class="grid-2">
+          <div class="card"><div class="card-head"><h3>Top ร้านค้าตามยอดสินเชื่อ</h3></div><div id="shop-ranking" class="card-body"></div></div>
+          <div class="card"><div class="card-head"><h3>เพิ่ม / อัปเดตร้านค้า</h3></div><div class="card-body"><div class="shop-form"><input id="shop-master-name" placeholder="ชื่อร้านค้า"><input id="shop-master-province" placeholder="จังหวัด"><button id="shop-master-save" class="btn btn-green" type="button">บันทึกร้านค้า</button></div><div id="shop-master-table"></div></div></div>
+        </div>
+      </section>
+
+      <section class="section" id="sec-commission">
+        <div class="commission-banner"><h2><i class="fa-solid fa-baht-sign"></i> รายงานค่าคอม</h2><p>อัตราค่าคอม: ใบสินเชื่อ 2.50 ฿, เอกสาร 2.50 ฿, ปิดเคส 5.00 ฿</p></div>
+        <div class="card"><div class="card-head"><h3>คำนวณค่าคอมรายเดือน</h3><div class="toolbar"><input id="commission-month" type="month"><button id="commission-save" class="btn btn-soft" type="button"><i class="fa-solid fa-calculator"></i> คำนวณ/บันทึกลง Sheet</button><button id="commission-export" class="btn btn-green" type="button">Export Excel</button></div></div><div id="commission-table" class="card-body"></div></div>
+      </section>
+
+      <section class="section" id="sec-ranking">
+        <div class="card"><div class="card-head"><h3><i class="fa-solid fa-trophy"></i> Top 10 Ranking</h3></div><div id="ranking-list" class="card-body ranking-list"></div></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
