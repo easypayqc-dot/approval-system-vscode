@@ -3,6 +3,8 @@
 const { SHEETS, HEADERS, EMPLOYEES, SLA_MINUTES } = require('../config/constants');
 const sheets = require('../integrations/googleSheetsClient');
 const { callAppsScript } = require('../integrations/appsScriptClient');
+const { isSupabaseEnabled } = require('../integrations/supabaseClient');
+const caseRepository = require('../repositories/caseRepository');
 const { clean, parseDate, monthKey, thaiDate, dateKey } = require('../utils/format');
 
 function getHeaderMap(headers) {
@@ -111,12 +113,19 @@ function recordFromRow(row, index, headers) {
   };
 }
 
-async function getRecordsRaw() {
+async function getRecordsRawFromSheet() {
   await ensureMainHeaders();
   const values = await sheets.getValues(SHEETS.MAIN, `A:${headerColumnLetter(HEADERS.length - 1)}`);
   if (values.length < 2) return [];
   const headers = values[0];
   return values.slice(1).map((row, i) => recordFromRow(row, i, headers)).filter(Boolean);
+}
+
+async function getRecordsRaw() {
+  if (isSupabaseEnabled()) {
+    return caseRepository.listCases();
+  }
+  return getRecordsRawFromSheet();
 }
 
 function mergeDataWithExisting(data = {}, existing = null) {
@@ -153,9 +162,9 @@ function validateSameApproverAndEvidence(data, existing = null) {
 
   if (!clean(next.date)) throw new Error('กรุณากรอกวันที่');
   if (!contractNo) throw new Error('กรุณากรอกเลขสัญญา');
-  if (!clean(next.shop)) throw new Error("กรุณากรอกร้านค้า");
-  if (!loan) throw new Error("กรุณาเลือกอนุมัติใบสินเชื่อ");
-  if (!(Number(String(next.price || 0).replace(/,/g, "")) > 0)) throw new Error("กรุณากรอกราคาสินค้า");
+  if (!clean(next.shop)) throw new Error('กรุณากรอกร้านค้า');
+  if (!loan) throw new Error('กรุณาเลือกอนุมัติใบสินเชื่อ');
+  if (!(Number(String(next.price || 0).replace(/,/g, '')) > 0)) throw new Error('กรุณากรอกราคาสินค้า');
 
   if (!EMPLOYEES.includes(loan)) {
     throw new Error('รายชื่อผู้อนุมัติใบสินเชื่อไม่ถูกต้อง');
@@ -181,72 +190,100 @@ function validateSameApproverAndEvidence(data, existing = null) {
   return next;
 }
 
-function normalizeRecord(data, existing = null) {
+function normalizedObject(data, existing = null) {
   const next = validateSameApproverAndEvidence(data, existing);
   const date = parseDate(next.date);
   const contractNo = clean(next.contractNo).toUpperCase();
   const price = Number(String(next.price || 0).replace(/,/g, '')) || 0;
+  const dateText = date ? dateKey(date) : clean(next.date);
+  const loan = clean(next.loanApproval);
+  const doc = clean(next.docApproval);
+  const close = clean(next.closeApproval);
 
-  return [
-    date ? dateKey(date) : '',
-    date ? monthKey(date) : '',
-    clean(next.loanApproval),
-    clean(next.docApproval),
-    clean(next.closeApproval),
-    clean(next.shop),
-    clean(next.province),
+  return {
+    date: dateText,
+    dateThai: date ? thaiDate(date) : '',
+    month: date ? monthKey(date) : (dateText ? dateText.slice(0, 7) : ''),
+    system: getSystem(contractNo),
+    loanApproval: loan,
+    docApproval: doc,
+    closeApproval: close,
+    shop: clean(next.shop),
+    province: clean(next.province),
     contractNo,
     price,
-    clean(next.note),
-    getCaseStatus(contractNo, next.loanApproval, next.docApproval, next.closeApproval),
-    clean(next.loanEvidence),
-    clean(next.docEvidence),
-    clean(next.closeEvidence),
-    clean(next.caseReceivedAt),
-    clean(next.loanCompletedAt),
-    clean(next.docCompletedAt),
-    clean(next.closeCompletedAt),
-    Number(next.slaMinutes) || SLA_MINUTES,
-    clean(next.slaStatus),
-    clean(next.tatMinutes)
+    note: clean(next.note),
+    caseStatus: getCaseStatus(contractNo, loan, doc, close),
+    loanEvidence: clean(next.loanEvidence),
+    docEvidence: clean(next.docEvidence),
+    closeEvidence: clean(next.closeEvidence),
+    caseReceivedAt: clean(next.caseReceivedAt),
+    loanCompletedAt: clean(next.loanCompletedAt),
+    docCompletedAt: clean(next.docCompletedAt),
+    closeCompletedAt: clean(next.closeCompletedAt),
+    slaMinutes: Number(next.slaMinutes) || SLA_MINUTES,
+    slaStatus: clean(next.slaStatus),
+    tatMinutes: clean(next.tatMinutes),
+    docRequired: isDocRequiredSystem(contractNo)
+  };
+}
+
+function normalizeRecord(data, existing = null) {
+  const record = normalizedObject(data, existing);
+  return [
+    record.date,
+    record.month,
+    record.loanApproval,
+    record.docApproval,
+    record.closeApproval,
+    record.shop,
+    record.province,
+    record.contractNo,
+    record.price,
+    record.note,
+    record.caseStatus,
+    record.loanEvidence,
+    record.docEvidence,
+    record.closeEvidence,
+    record.caseReceivedAt,
+    record.loanCompletedAt,
+    record.docCompletedAt,
+    record.closeCompletedAt,
+    record.slaMinutes,
+    record.slaStatus,
+    record.tatMinutes
   ];
 }
 
-async function findRowByContract(contractNo) {
-  const records = await getRecordsRaw();
+async function findSheetRowByContract(contractNo) {
+  const records = await getRecordsRawFromSheet();
   const found = records.find((r) => r.contractNo === clean(contractNo).toUpperCase());
   return found ? found.row : -1;
 }
 
-async function getRecordByContract(contractNo) {
-  const records = await getRecordsRaw();
+async function getSheetRecordByContract(contractNo) {
+  const records = await getRecordsRawFromSheet();
   return records.find((r) => r.contractNo === clean(contractNo).toUpperCase()) || null;
 }
 
-
-async function deleteRecord(contractNoOrRow) {
-  const text = clean(contractNoOrRow);
-  if (!text) throw new Error('ไม่พบข้อมูลสำหรับลบ');
-
-  let existing = await getRecordByContract(text);
-  let row = -1;
-  if (!existing && /^\d+$/.test(text)) {
-    row = Number(text);
-    const records = await getRecordsRaw();
-    existing = records.find((record) => Number(record.row) === row) || null;
+async function findRowByContract(contractNo) {
+  if (isSupabaseEnabled()) {
+    const found = await caseRepository.findCaseByContract(contractNo);
+    return found ? found.row : -1;
   }
-  if (!existing) throw new Error('ไม่พบเลขสัญญาหรือแถวที่ต้องการลบ');
-
-  return callAppsScript('deleteRecord', {
-    contractNo: existing.contractNo,
-    row: existing.row,
-    evidenceUrls: [existing.loanEvidence, existing.docEvidence, existing.closeEvidence].filter(Boolean)
-  });
+  return findSheetRowByContract(contractNo);
 }
 
-async function saveRecord(data) {
+async function getRecordByContract(contractNo) {
+  if (isSupabaseEnabled()) {
+    return caseRepository.findCaseByContract(contractNo);
+  }
+  return getSheetRecordByContract(contractNo);
+}
+
+async function saveRecordToSheet(data) {
   await ensureMainHeaders();
-  const existing = await getRecordByContract(data.contractNo);
+  const existing = await getSheetRecordByContract(data.contractNo);
   const rowData = normalizeRecord(data, existing);
 
   if (existing?.row) {
@@ -254,8 +291,102 @@ async function saveRecord(data) {
     return { row: existing.row, duplicated: true };
   }
 
-  await sheets.appendValues(SHEETS.MAIN, [rowData]);
-  return { duplicated: false };
+  const result = await sheets.appendValues(SHEETS.MAIN, [rowData]);
+  return { row: result?.startRow || null, duplicated: false };
+}
+
+async function deleteRecordFromSheetAndDrive(existing) {
+  return callAppsScript('deleteRecord', {
+    contractNo: existing.contractNo,
+    row: existing.row,
+    evidenceUrls: [existing.loanEvidence, existing.docEvidence, existing.closeEvidence].filter(Boolean)
+  });
+}
+
+async function trashEvidenceOnly(existing) {
+  const evidenceUrls = [existing.loanEvidence, existing.docEvidence, existing.closeEvidence].filter(Boolean);
+  if (!evidenceUrls.length) return null;
+  try {
+    return await callAppsScript('trashDriveFiles', { urls: evidenceUrls });
+  } catch (err) {
+    return { success: false, message: err.message };
+  }
+}
+
+async function deleteRecord(contractNoOrRow) {
+  const text = clean(contractNoOrRow);
+  if (!text) throw new Error('ไม่พบข้อมูลสำหรับลบ');
+
+  if (isSupabaseEnabled()) {
+    let existing = await caseRepository.findCaseByContract(text);
+    if (!existing && /^\d+$/.test(text)) {
+      existing = await caseRepository.findCaseById(Number(text));
+    }
+    if (!existing) throw new Error('ไม่พบเลขสัญญาหรือแถวที่ต้องการลบ');
+
+    const deleted = await caseRepository.deleteCaseByContract(existing.contractNo);
+
+    let sheetResult = null;
+    try {
+      sheetResult = await deleteRecordFromSheetAndDrive(existing);
+    } catch (err) {
+      sheetResult = {
+        success: false,
+        message: err.message,
+        trashFallback: await trashEvidenceOnly(existing)
+      };
+    }
+
+    return {
+      deleted: Boolean(deleted),
+      source: 'supabase',
+      contractNo: existing.contractNo,
+      sheetSync: sheetResult
+    };
+  }
+
+  let existing = await getSheetRecordByContract(text);
+  let row = -1;
+  if (!existing && /^\d+$/.test(text)) {
+    row = Number(text);
+    const records = await getRecordsRawFromSheet();
+    existing = records.find((record) => Number(record.row) === row) || null;
+  }
+  if (!existing) throw new Error('ไม่พบเลขสัญญาหรือแถวที่ต้องการลบ');
+
+  return deleteRecordFromSheetAndDrive(existing);
+}
+
+async function saveRecord(data) {
+  if (isSupabaseEnabled()) {
+    const existing = await caseRepository.findCaseByContract(data.contractNo);
+    const record = normalizedObject(data, existing);
+
+    const saved = await caseRepository.upsertCase({ ...record, sheetSyncStatus: 'pending' });
+
+    let sheetSync = { ok: false, skipped: false, message: '' };
+    try {
+      const sheetResult = await saveRecordToSheet(record);
+      sheetSync = { ok: true, ...sheetResult };
+      await caseRepository.updateSheetSyncStatus(record.contractNo, 'synced', '');
+    } catch (err) {
+      sheetSync = { ok: false, message: err.message };
+      try {
+        await caseRepository.updateSheetSyncStatus(record.contractNo, 'failed', err.message);
+      } catch (_syncErr) {
+        // ถ้า update sync status ไม่สำเร็จ ห้ามทำให้การบันทึกหลักล้ม
+      }
+    }
+
+    return {
+      ...saved,
+      duplicated: Boolean(existing),
+      source: 'supabase',
+      sheetSync
+    };
+  }
+
+  return saveRecordToSheet(data);
 }
 
 module.exports = {
@@ -269,5 +400,7 @@ module.exports = {
   normalizeRecord,
   validateSameApproverAndEvidence,
   isDocRequiredSystem,
-  ensureMainHeaders
+  ensureMainHeaders,
+  getRecordsRawFromSheet,
+  saveRecordToSheet
 };

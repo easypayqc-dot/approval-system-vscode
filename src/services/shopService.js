@@ -3,6 +3,8 @@
 const { SHEETS, SHOP_HEADERS } = require('../config/constants');
 const sheets = require('../integrations/googleSheetsClient');
 const { callAppsScript } = require('../integrations/appsScriptClient');
+const { isSupabaseEnabled } = require('../integrations/supabaseClient');
+const shopRepository = require('../repositories/shopRepository');
 const { clean } = require('../utils/format');
 
 function normalizeShopName(value) {
@@ -45,8 +47,7 @@ async function seedMasterDataIfPossible() {
   }
 }
 
-async function getShops(options = {}) {
-  const autoSeed = options.autoSeed !== false;
+async function getSheetShopsWithAutoSeed(autoSeed = true) {
   await ensureShopHeaders();
 
   let shops = await readShopsFromSheet();
@@ -61,21 +62,44 @@ async function getShops(options = {}) {
   return shops;
 }
 
+async function seedSupabaseShopsFromSheetIfEmpty(autoSeed = true) {
+  const current = await shopRepository.listShops();
+  if (current.length || !autoSeed) return current;
+
+  const sheetShops = await getSheetShopsWithAutoSeed(true);
+  if (!sheetShops.length) return [];
+
+  await shopRepository.bulkUpsertShops(sheetShops);
+  return shopRepository.listShops();
+}
+
+async function getShops(options = {}) {
+  const autoSeed = options.autoSeed !== false;
+
+  if (isSupabaseEnabled()) {
+    return seedSupabaseShopsFromSheetIfEmpty(autoSeed);
+  }
+
+  return getSheetShopsWithAutoSeed(autoSeed);
+}
+
 async function findShopRow(shopName) {
   const target = normalizeShopName(shopName).toLowerCase();
   if (!target) return -1;
+
+  if (isSupabaseEnabled()) {
+    const found = await shopRepository.findShop(shopName);
+    return found ? found.row : -1;
+  }
+
   const shops = await getShops({ autoSeed: false });
   const found = shops.find((item) => item.shop.toLowerCase() === target);
   return found ? found.row : -1;
 }
 
-async function addShop(data = {}) {
+async function addShopToSheet(shop, province) {
   await ensureShopHeaders();
-  const shop = normalizeShopName(data.shop || data.shopName);
-  const province = normalizeProvince(data.province);
-  if (!shop) throw new Error('กรุณากรอกชื่อร้านค้า');
-  if (!province) throw new Error('กรุณากรอกจังหวัด');
-  const row = await findShopRow(shop);
+  const row = await findShopRowInSheet(shop);
   if (row > -1) {
     await sheets.updateValues(SHEETS.SHOPS, `A${row}:B${row}`, [[shop, province]]);
     return { shop, province, row, updated: true };
@@ -84,4 +108,49 @@ async function addShop(data = {}) {
   return { shop, province, row: result.startRow || null, updated: false };
 }
 
-module.exports = { getShops, addShop, findShopRow, ensureShopHeaders };
+async function findShopRowInSheet(shopName) {
+  const target = normalizeShopName(shopName).toLowerCase();
+  if (!target) return -1;
+  const shops = await getSheetShopsWithAutoSeed(false);
+  const found = shops.find((item) => item.shop.toLowerCase() === target);
+  return found ? found.row : -1;
+}
+
+async function addShop(data = {}) {
+  const shop = normalizeShopName(data.shop || data.shopName);
+  const province = normalizeProvince(data.province);
+  if (!shop) throw new Error('กรุณากรอกชื่อร้านค้า');
+  if (!province) throw new Error('กรุณากรอกจังหวัด');
+
+  if (isSupabaseEnabled()) {
+    const before = await shopRepository.findShop(shop);
+    const saved = await shopRepository.upsertShop(shop, province);
+
+    let sheetSync = { ok: false, message: '' };
+    try {
+      sheetSync = { ok: true, ...(await addShopToSheet(shop, province)) };
+    } catch (err) {
+      // Supabase เป็นฐานหลักแล้ว ดังนั้นห้ามให้ Sheet sync ทำให้การเพิ่มร้านค้าล้ม
+      sheetSync = { ok: false, message: err.message };
+    }
+
+    return {
+      shop: saved.shop,
+      province: saved.province,
+      row: saved.row,
+      updated: Boolean(before),
+      source: 'supabase',
+      sheetSync
+    };
+  }
+
+  return addShopToSheet(shop, province);
+}
+
+module.exports = {
+  getShops,
+  addShop,
+  findShopRow,
+  ensureShopHeaders,
+  readShopsFromSheet
+};
